@@ -7,6 +7,7 @@ WriteMakefile
           'NAME' => 'CGI::Application::Plugin::LogDispatch',
           'VERSION_FROM' => 'lib/CGI/Application/Plugin/LogDispatch.pm',
           'PREREQ_PM' => {
+                           'CGI::Application' => 0,
                            'Log::Dispatch' => '0.21',
                            'UNIVERSAL::require' => 0
                          }

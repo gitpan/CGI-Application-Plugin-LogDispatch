@@ -4,6 +4,7 @@ Module::Build->new(
     module_name => 'CGI::Application::Plugin::LogDispatch',
     license => 'perl',
     requires => {
+        'CGI::Application' => 0,
         'Log::Dispatch' => '0.21',
         'UNIVERSAL::require' => 0,
     },

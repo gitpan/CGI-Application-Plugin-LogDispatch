@@ -15,7 +15,7 @@ require UNIVERSAL::require;
 );
 sub import { goto &Exporter::import }
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 
 sub log {
     my $self = shift;
