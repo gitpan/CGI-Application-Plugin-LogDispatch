@@ -10,6 +10,7 @@ t/02_newline.t
 t/03_options.t
 t/04_multiple.t
 t/05_logmethods.t
+t/06_singleton.t
 t/99_pod.t
 t/DummyIOHandle.pm
 t/TestAppBasic.pm
@@ -17,3 +18,4 @@ t/TestAppLogMethods.pm
 t/TestAppMultiple.pm
 t/TestAppNewline.pm
 t/TestAppOptions.pm
+t/TestAppSingleton.pm

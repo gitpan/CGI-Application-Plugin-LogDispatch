@@ -3,10 +3,54 @@ NAME
     CGI::Application
 
 SYNOPSIS
+     package My::App;
+
      use CGI::Application::Plugin::LogDispatch;
 
-     $self->log->info('Information message');
-     $self->log->debug('Debug message');
+     sub cgiapp_init {
+       my $self = shift;
+
+       # calling log_config is optional as
+       # some simple defaults will be used
+       $self->log_config(
+         LOG_DISPATCH_MODULES => [ 
+           {    module => 'Log::Dispatch::File',
+                  name => 'debug',
+              filename => '/tmp/debug.log',
+             min_level => 'debug',
+           },
+         ]
+       );
+     }
+
+     sub myrunmode {
+       my $self = shift;
+
+       $self->log->info('Information message');
+       $self->log->debug('Debug message');
+     }
+
+     - or as a class based singleton -
+
+     package My::App;
+
+     use CGI::Application::Plugin::LogDispatch (
+       LOG_DISPATCH_MODULES => [ 
+         {    module => 'Log::Dispatch::File',
+                name => 'debug',
+            filename => '/tmp/debug.log',
+           min_level => 'debug',
+         },
+       ]
+     );
+
+     My::App->log->info('Information message');
+
+     sub myrunmode {
+       my $self = shift;
+
+       $self->log->info('This also works');
+     }
 
 DESCRIPTION
     CGI::Application::Plugin::LogDispatch adds logging support to your
@@ -32,6 +76,11 @@ METHODS
  
       # use the log object directly
       $self->log->debug(Data::Dumper::Dumper(\%hash));
+
+      - or - 
+
+      # if you configured it as a singleton
+      My::App->log->debug('This works too');
 
   log_config
     This method can be used to customize the functionality of the
@@ -199,6 +248,74 @@ EXAMPLE
         }
 
         # etc...
+      }
+
+SINGLETON SUPPORT
+    This module can be used as a singleton object. This means that when the
+    object is created, it will remain accessable for the duration of the
+    process. This can be useful in persistent environments like mod_perl and
+    PersistentPerl, since the object only has to be created one time, and
+    will remain in memory across multiple requests. It can also be useful if
+    you want to setup a DIE handler, or WARN handler, since you will not
+    have access to the $self object.
+
+    To use this module as a singleton you need to provide all configuration
+    parameters as options to the use statement. The use statement will
+    accept all the same parameters that the log_config method accepts, so
+    see the documentation above for more details.
+
+    When creating the singleton, the log object will be saved in the
+    namespace of the module that created it. The singleton will also be
+    inherited by any subclasses of this module.
+
+    NOTE: Singleton support requires the Class::ISA module which is not
+    installed automatically by this module.
+
+SINGLETON EXAMPLE
+      package My::App;
+  
+      use base qw(CGI::Application);
+      use CGI::Application::Plugin::LogDispatch(
+          LOG_DISPATCH_MODULES => [ 
+            {    module => 'Log::Dispatch::File',
+                   name => 'messages',
+               filename => '/tmp/messages.log',
+              min_level => 'error'
+            },
+          ],
+          APPEND_NEWLINE => 1,
+        );
+ 
+      }
+ 
+      sub cgiapp_prerun {
+        my $self = shift;
+ 
+        $self->log->debug("Current runmode:  ".$self->get_current_runmode);
+      }
+ 
+      sub my_runmode {
+        my $self = shift;
+        my $log  = shift;
+
+        if ($ENV{'REMOTE_USER'}) {
+          $log->info("user ".$ENV{'REMOTE_USER'});
+        }
+
+        # etc...
+      }
+
+      package My::App::Subclass;
+
+      use base qw(My::App);
+
+      # Setup a die handler that uses the logger
+      $SIG{__DIE__} = sub { My::App::Subclass->log->emerg(@_); CORE::die(@_); };
+
+      sub my_other_runmode {
+        my $self = shift;
+
+        $self->log->info("This will log to the logger configured in My::App");
       }
 
 BUGS

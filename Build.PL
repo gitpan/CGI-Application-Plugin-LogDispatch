@@ -7,9 +7,11 @@ Module::Build->new(
         'CGI::Application' => 0,
         'Log::Dispatch' => '0.21',
         'UNIVERSAL::require' => 0,
+        'Scalar::Util' => 0,
     },
     recommends => {
         'Sub::WrapPackages' => 0,
+        'Class::ISA' => 0,
     },
     create_makefile_pl => 'traditional',
     create_readme => 1,

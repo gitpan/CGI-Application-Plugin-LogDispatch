@@ -1,5 +1,9 @@
 Revision history for Perl extension CGI::Application::Plugin::LogDispatch.
 
+0.03  Tue Jan 18 23:58:30 EST 2005
+
+    - added singleton support
+
 0.02  Thu Dec 16 11:14:56 EST 2004
 
     - forgot to include CGI::Application as a dependancy

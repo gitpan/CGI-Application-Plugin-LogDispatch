@@ -1,41 +1,50 @@
 package CGI::Application::Plugin::LogDispatch;
 
-use Log::Dispatch;
-use Log::Dispatch::Screen;
-
 use strict;
 use vars qw($VERSION @EXPORT);
 
-require Exporter;
+use Log::Dispatch;
+use Log::Dispatch::Screen;
+use Scalar::Util ();
+use CGI::Application ();
 require UNIVERSAL::require;
+
+$VERSION = 0.03;
 
 @EXPORT = qw(
   log
   log_config
 );
-sub import { goto &Exporter::import }
 
-$VERSION = 0.02;
+sub import { 
+    my $pkg = shift;
+    my $callpkg = caller;
+    no strict 'refs';
+    foreach my $sym (@EXPORT) {
+        *{"${callpkg}::$sym"} = \&{$sym};
+    }
+    $callpkg->log_config(@_) if @_;
+}
 
 sub log {
     my $self = shift;
 
-    if (!$self->{__LOG}) {
+    my ($log, $options, $frompkg) = _get_object_or_options($self);
+
+    if (!$log) {
         # define the config hash if it doesn't exist to save some checks later
-        $self->{__LOG_CONFIG} = {} unless $self->{__LOG_CONFIG};
+        $options = {} unless $options;
 
         # create Log::Dispatch object
-        $self->{__LOG} = Log::Dispatch->new( callbacks => sub { my %hash = @_; chomp $hash{message}; return $hash{message}.$/; } );
-
-        if ($self->{__LOG_CONFIG}->{LOG_DISPATCH_OPTIONS}) {
+        if ($options->{LOG_DISPATCH_OPTIONS}) {
             # use the parameters the user supplied
-            $self->{__LOG} = Log::Dispatch->new( %{ $self->{__LOG_CONFIG}->{LOG_DISPATCH_OPTIONS} } );
+            $log = Log::Dispatch->new( %{ $options->{LOG_DISPATCH_OPTIONS} } );
         } else {
-            $self->{__LOG} = Log::Dispatch->new( );
+            $log = Log::Dispatch->new( );
         }
 
-        if ($self->{__LOG_CONFIG}->{LOG_DISPATCH_MODULES}) {
-            foreach my $logger (@{ $self->{__LOG_CONFIG}->{LOG_DISPATCH_MODULES} }) {
+        if ($options->{LOG_DISPATCH_MODULES}) {
+            foreach my $logger (@{ $options->{LOG_DISPATCH_MODULES} }) {
                 if (!$logger->{module}) {
                     # no logger module provided
                     #  not fatal... just skip this logger
@@ -47,14 +56,14 @@ sub log {
                 } else {
                     my $module = delete $logger->{module};
                     # setup a callback to append a newline if requested
-                    if ($logger->{append_newline} || $self->{__LOG_CONFIG}->{APPEND_NEWLINE}) {
+                    if ($logger->{append_newline} || $options->{APPEND_NEWLINE}) {
                         delete $logger->{append_newline} if exists $logger->{append_newline};
                         $logger->{callbacks} = [ $logger->{callbacks} ]
                             if $logger->{callbacks} &&  ref $logger->{callbacks} ne 'ARRAY';
                         push @{ $logger->{callbacks} }, \&append_newline;
                     }
                     # add the logger to the dispatcher
-                    $self->{__LOG}->add( $module->new( %$logger ) );
+                    $log->add( $module->new( %$logger ) );
                 }
             }
         } else {
@@ -64,44 +73,55 @@ sub log {
                               stderr => 1,
                            min_level => 'debug',
             );
-            $options{callbacks} = \&append_newline if $self->{__LOG_CONFIG}->{APPEND_NEWLINE};
-            $self->{__LOG}->add( Log::Dispatch::Screen->new( %options ) );
+            $options{callbacks} = \&append_newline if $options->{APPEND_NEWLINE};
+            $log->add( Log::Dispatch::Screen->new( %options ) );
         }
+        _set_object($frompkg||$self, $log);
     }
 
-    return $self->{__LOG};
+    return $log;
 }
 
 sub log_config {
     my $self = shift;
+    my $class = ref $self ? ref $self : $self;
+
+    my $log_config;
+    if (ref $self) {
+        die "Calling log_config after the log object has already been created" if @_ && defined $self->{__LOG};
+        $log_config = $self->{__LOG_CONFIG} ||= {};
+    } else {
+        no strict 'refs';
+        ${$class.'::__LOG_CONFIG'} ||= {};
+        $log_config = ${$class.'::__LOG_CONFIG'};
+    }
 
     if (@_) {
-        die "Calling log_config after the log object has already been created" if (defined $self->{__LOG});
         my $props;
         if (ref($_[0]) eq 'HASH') {
             my $rthash = %{$_[0]};
-            $props = $self->_cap_hash($_[0]);
+            $props = CGI::Application->_cap_hash($_[0]);
         } else {
-            $props = $self->_cap_hash({ @_ });
+            $props = CGI::Application->_cap_hash({ @_ });
         }
-
+        my %options;
         # Check for LOG_OPTIONS
         if ($props->{LOG_DISPATCH_OPTIONS}) {
             die "log_config error:  parameter LOG_DISPATCH_OPTIONS is not a hash reference"
                 if ref $props->{LOG_DISPATCH_OPTIONS} ne 'HASH';
-            $self->{__LOG_CONFIG}->{LOG_DISPATCH_OPTIONS} = delete $props->{LOG_DISPATCH_OPTIONS};
+            $log_config->{LOG_DISPATCH_OPTIONS} = delete $props->{LOG_DISPATCH_OPTIONS};
         }
 
         # Check for LOG_DISPATCH_MODULES
         if ($props->{LOG_DISPATCH_MODULES}) {
             die "log_config error:  parameter LOG_DISPATCH_MODULES is not an array reference"
                 if ref $props->{LOG_DISPATCH_MODULES} ne 'ARRAY';
-            $self->{__LOG_CONFIG}->{LOG_DISPATCH_MODULES} = delete $props->{LOG_DISPATCH_MODULES};
+            $log_config->{LOG_DISPATCH_MODULES} = delete $props->{LOG_DISPATCH_MODULES};
         }
 
         # Check for APPEND_NEWLINE
         if ($props->{APPEND_NEWLINE}) {
-            $self->{__LOG_CONFIG}->{APPEND_NEWLINE} = 1;
+            $log_config->{APPEND_NEWLINE} = 1;
             delete $props->{APPEND_NEWLINE};
         }
 
@@ -117,7 +137,7 @@ sub log_config {
         die "Invalid option(s) (".join(', ', keys %$props).") passed to log_config" if %$props;
     }
 
-    $self->{__LOG_CONFIG};
+    $log_config;
 }
 
 sub log_subroutine_calls {
@@ -147,6 +167,46 @@ sub append_newline {
 }
 
 
+##
+## Private methods
+##
+sub _set_object {
+    my $self = shift;
+    my $log  = shift;
+    my $class = ref $self ? ref $self : $self;
+
+    if (ref $self) {
+        $self->{__LOG_OBJECT} = $log;
+    } else {
+        no strict 'refs';
+        ${$class.'::__LOG_OBJECT'} = $log;
+    }
+}
+
+sub _get_object_or_options {
+    my $self = shift;
+    my $class = ref $self ? ref $self : $self;
+
+    # Handle the simple case by looking in the object first
+    if (ref $self) {
+        return ($self->{__LOG_OBJECT}, undef) if $self->{__LOG_OBJECT};
+        return (undef, $self->{__LOG_CONFIG}) if $self->{__LOG_CONFIG};
+    }
+
+    # See if we can find them in the class hierarchy
+    #  We look at each of the modules in the @ISA tree, and
+    #  their parents as well until we find either a log
+    #  object or a set of configuration parameters
+    require Class::ISA;
+    foreach my $super ($class, Class::ISA::super_path($class)) {
+        no strict 'refs';
+        return (${$super.'::__LOG_OBJECT'}, undef) if ${$super.'::__LOG_OBJECT'};
+        return (undef, ${$super.'::__LOG_CONFIG'}, $super) if ${$super.'::__LOG_CONFIG'};
+    }
+    return;
+}
+
+
 1;
 __END__
 
@@ -157,10 +217,55 @@ CGI::Application::Plugin::LogDispatch - Add Log::Dispatch support to CGI::Applic
 
 =head1 SYNOPSIS
 
+ package My::App;
+
  use CGI::Application::Plugin::LogDispatch;
 
- $self->log->info('Information message');
- $self->log->debug('Debug message');
+ sub cgiapp_init {
+   my $self = shift;
+
+   # calling log_config is optional as
+   # some simple defaults will be used
+   $self->log_config(
+     LOG_DISPATCH_MODULES => [ 
+       {    module => 'Log::Dispatch::File',
+              name => 'debug',
+          filename => '/tmp/debug.log',
+         min_level => 'debug',
+       },
+     ]
+   );
+ }
+
+ sub myrunmode {
+   my $self = shift;
+
+   $self->log->info('Information message');
+   $self->log->debug('Debug message');
+ }
+
+ - or as a class based singleton -
+
+ package My::App;
+
+ use CGI::Application::Plugin::LogDispatch (
+   LOG_DISPATCH_MODULES => [ 
+     {    module => 'Log::Dispatch::File',
+            name => 'debug',
+        filename => '/tmp/debug.log',
+       min_level => 'debug',
+     },
+   ]
+ );
+
+ My::App->log->info('Information message');
+
+ sub myrunmode {
+   my $self = shift;
+
+   $self->log->info('This also works');
+ }
+
 
 =head1 DESCRIPTION
 
@@ -187,6 +292,11 @@ sane defaults to create the dispatcher object (the exact default values are defi
  
   # use the log object directly
   $self->log->debug(Data::Dumper::Dumper(\%hash));
+
+  - or - 
+
+  # if you configured it as a singleton
+  My::App->log->debug('This works too');
 
 
 =head2 log_config
@@ -357,6 +467,74 @@ In a CGI::Application module:
     }
 
     # etc...
+  }
+
+=head1 SINGLETON SUPPORT
+
+This module can be used as a singleton object.  This means that when the object
+is created, it will remain accessable for the duration of the process.  This can
+be useful in persistent environments like mod_perl and PersistentPerl, since the
+object only has to be created one time, and will remain in memory across multiple
+requests.  It can also be useful if you want to setup a DIE handler, or WARN handler,
+since you will not have access to the $self object.
+
+To use this module as a singleton you need to provide all configuration parameters
+as options to the use statement.  The use statement will accept all the same parameters
+that the log_config method accepts, so see the documentation above for more details.
+
+When creating the singleton, the log object will be saved in the namespace of the
+module that created it.  The singleton will also be inherited by any subclasses of
+this module.
+
+NOTE:  Singleton support requires the Class::ISA module which is not installed
+automatically by this module.
+
+=head1 SINGLETON EXAMPLE
+
+  package My::App;
+  
+  use base qw(CGI::Application);
+  use CGI::Application::Plugin::LogDispatch(
+      LOG_DISPATCH_MODULES => [ 
+        {    module => 'Log::Dispatch::File',
+               name => 'messages',
+           filename => '/tmp/messages.log',
+          min_level => 'error'
+        },
+      ],
+      APPEND_NEWLINE => 1,
+    );
+ 
+  }
+ 
+  sub cgiapp_prerun {
+    my $self = shift;
+ 
+    $self->log->debug("Current runmode:  ".$self->get_current_runmode);
+  }
+ 
+  sub my_runmode {
+    my $self = shift;
+    my $log  = shift;
+
+    if ($ENV{'REMOTE_USER'}) {
+      $log->info("user ".$ENV{'REMOTE_USER'});
+    }
+
+    # etc...
+  }
+
+  package My::App::Subclass;
+
+  use base qw(My::App);
+
+  # Setup a die handler that uses the logger
+  $SIG{__DIE__} = sub { My::App::Subclass->log->emerg(@_); CORE::die(@_); };
+
+  sub my_other_runmode {
+    my $self = shift;
+
+    $self->log->info("This will log to the logger configured in My::App");
   }
 
 
