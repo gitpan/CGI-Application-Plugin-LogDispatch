@@ -1,0 +1,18 @@
+--- #YAML:1.0
+name: CGI-Application-Plugin-LogDispatch
+version: 0.01
+author:
+  - Cees Hek <cees@crtconsulting.ca>
+abstract: |-
+  Plugin that adds Log::Dispatch support to CGI::Application
+license: perl
+requires:
+  Log::Dispatch: 0.21
+  UNIVERSAL::require: 0
+recommends:
+  Sub::WrapPackages: 0
+provides:
+  CGI::Application::Plugin::LogDispatch:
+    file: lib/CGI/Application/Plugin/LogDispatch.pm
+    version: 0.01
+generated_by: Module::Build version 0.26
