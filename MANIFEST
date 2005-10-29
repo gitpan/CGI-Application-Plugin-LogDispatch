@@ -11,7 +11,8 @@ t/03_options.t
 t/04_multiple.t
 t/05_logmethods.t
 t/06_singleton.t
-t/99_pod.t
+t/pod.t
+t/pod_coverage.t
 t/DummyIOHandle.pm
 t/TestAppBasic.pm
 t/TestAppLogMethods.pm

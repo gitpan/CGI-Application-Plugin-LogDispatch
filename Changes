@@ -1,5 +1,12 @@
 Revision history for Perl extension CGI::Application::Plugin::LogDispatch.
 
+1.00  Sat Oct 29 11:55:42 EDT 2005
+
+    - Simplify the pod tests according to Test::Pod docs
+    - Add pod coverage tests
+    - Rename some internal subs with a leading underscore
+    - Change contact address
+
 0.03  Tue Jan 18 23:58:30 EST 2005
 
     - added singleton support

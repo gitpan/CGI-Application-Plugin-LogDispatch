@@ -14,8 +14,7 @@ Module::Build->new(
         'Class::ISA' => 0,
     },
     create_makefile_pl => 'traditional',
-    create_readme => 1,
-    dist_author => 'Cees Hek <cees@crtconsulting.ca>',
+    dist_author => 'Cees Hek <ceeshek@gmail.com>',
     dist_abstract => 'Plugin that adds Log::Dispatch support to CGI::Application',
 )->create_build_script;
 

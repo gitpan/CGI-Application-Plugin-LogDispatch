@@ -9,7 +9,7 @@ use Scalar::Util ();
 use CGI::Application ();
 require UNIVERSAL::require;
 
-$VERSION = 0.03;
+$VERSION = '1.00';
 
 @EXPORT = qw(
   log
@@ -60,7 +60,7 @@ sub log {
                         delete $logger->{append_newline} if exists $logger->{append_newline};
                         $logger->{callbacks} = [ $logger->{callbacks} ]
                             if $logger->{callbacks} &&  ref $logger->{callbacks} ne 'ARRAY';
-                        push @{ $logger->{callbacks} }, \&append_newline;
+                        push @{ $logger->{callbacks} }, \&_append_newline;
                     }
                     # add the logger to the dispatcher
                     $log->add( $module->new( %$logger ) );
@@ -73,7 +73,7 @@ sub log {
                               stderr => 1,
                            min_level => 'debug',
             );
-            $options{callbacks} = \&append_newline if $options->{APPEND_NEWLINE};
+            $options{callbacks} = \&_append_newline if $options->{APPEND_NEWLINE};
             $log->add( Log::Dispatch::Screen->new( %options ) );
         }
         _set_object($frompkg||$self, $log);
@@ -129,7 +129,7 @@ sub log_config {
         if ($props->{LOG_METHOD_EXECUTION}) {
             die "log_config error:  parameter LOG_METHOD_EXECUTION is not an array reference"
                 if ref $props->{LOG_METHOD_EXECUTION} ne 'ARRAY';
-            log_subroutine_calls($self->log, @{$props->{LOG_METHOD_EXECUTION}});
+            _log_subroutine_calls($self->log, @{$props->{LOG_METHOD_EXECUTION}});
             delete $props->{LOG_METHOD_EXECUTION};
         }
 
@@ -140,7 +140,7 @@ sub log_config {
     $log_config;
 }
 
-sub log_subroutine_calls {
+sub _log_subroutine_calls {
   my $log = shift;
   eval {
     Sub::WrapPackages->require;
@@ -160,7 +160,7 @@ sub log_subroutine_calls {
   };
 }
 
-sub append_newline {
+sub _append_newline {
   my %hash = @_;
   chomp $hash{message};
   return $hash{message}.$/;
@@ -285,8 +285,8 @@ sane defaults to create the dispatcher object (the exact default values are defi
 
   # retrieve the log object
   my $log = $self->log;
-  $log->warning("something's not right!";
-  $log->emergency("It's all gone pear shaped!";
+  $log->warning("something's not right!");
+  $log->emergency("It's all gone pear shaped!");
  
   - or -
  
@@ -460,7 +460,7 @@ In a CGI::Application module:
  
   sub my_runmode {
     my $self = shift;
-    my $log  = shift;
+    my $log  = $self->log;
 
     if ($ENV{'REMOTE_USER'}) {
       $log->info("user ".$ENV{'REMOTE_USER'});
@@ -515,7 +515,7 @@ automatically by this module.
  
   sub my_runmode {
     my $self = shift;
-    my $log  = shift;
+    my $log  = $self->log;
 
     if ($ENV{'REMOTE_USER'}) {
       $log->info("user ".$ENV{'REMOTE_USER'});
@@ -540,8 +540,10 @@ automatically by this module.
 
 =head1 BUGS
 
-This is alpha software and as such, the features and interface
-are subject to change.  So please check the Changes file when upgrading.
+Please report any bugs or feature requests to
+C<bug-cgi-application-plugin-logdispatch@rt.cpan.org>, or through the web
+interface at L<http://rt.cpan.org>.  I will be notified, and then you'll
+automatically be notified of progress on your bug as I make changes.
 
 
 =head1 SEE ALSO
@@ -551,12 +553,12 @@ L<CGI::Application>, L<Log::Dispatch>, L<Log::Dispatch::Screen>, L<Sub::WrapPack
 
 =head1 AUTHOR
 
-Cees Hek <cees@crtconsulting.ca>
+Cees Hek <ceeshek@gmail.com>
 
 
 =head1 LICENSE
 
-Copyright (C) 2004 Cees Hek <cees@crtconsulting.ca>
+Copyright (C) 2004 Cees Hek <ceeshek@gmail.com>
 
 This library is free software. You can modify and or distribute it under the same terms as Perl itself.
 
