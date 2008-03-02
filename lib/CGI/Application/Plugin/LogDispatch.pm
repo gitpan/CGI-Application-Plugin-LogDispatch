@@ -7,9 +7,10 @@ use Log::Dispatch;
 use Log::Dispatch::Screen;
 use Scalar::Util ();
 use CGI::Application ();
+use File::Spec ();
 require UNIVERSAL::require;
 
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 @EXPORT = qw(
   log
@@ -77,6 +78,24 @@ sub log {
             $log->add( Log::Dispatch::Screen->new( %options ) );
         }
         _set_object($frompkg||$self, $log);
+
+        # CAP::DevPopup support
+        if (UNIVERSAL::can($self, 'devpopup')) {
+            # Register our report with DevPopup
+            $self->add_callback( 'devpopup_report', \&_devpopup_report );
+
+            # Create logger to capture all log entries
+            my %options = (
+                'name'      => 'DevPopup',
+                'min_level' => 'debug',
+                'filename'  => File::Spec->devnull(),
+                'callbacks' => sub {
+                    my %args = @_;
+                    push( @{$self->{LOG_DISPATCH_DEVPOPUP_HISTORY}}, [$args{level}, $args{message}] );
+                    },
+                );
+            $log->add( Log::Dispatch::File->new(%options) );
+        }
     }
 
     return $log;
@@ -88,10 +107,11 @@ sub log_config {
 
     my $log_config;
     if (ref $self) {
-        die "Calling log_config after the log object has already been created" if @_ && defined $self->{__LOG};
+        die "Calling log_config after the log object has already been created" if @_ && defined $self->{__LOG_OBJECT};
         $log_config = $self->{__LOG_CONFIG} ||= {};
     } else {
         no strict 'refs';
+        die "Calling log_config after the log object has already been created" if @_ && defined ${$class.'::__LOG_OBJECT'};
         ${$class.'::__LOG_CONFIG'} ||= {};
         $log_config = ${$class.'::__LOG_CONFIG'};
     }
@@ -206,6 +226,30 @@ sub _get_object_or_options {
     return;
 }
 
+sub _devpopup_report {
+    my $self = shift;
+    my $r=0;
+    my $history = join $/, map {
+                    $r=1-$r;
+                    qq(<tr class="@{[$r?'odd':'even']}"><td valign="top">$_->[0]</td><td>$_->[1]</td></tr>)
+                    }
+                    @{$self->{LOG_DISPATCH_DEVPOPUP_HISTORY}};
+    $self->devpopup->add_report(
+        title   => 'Log Entries',
+        summary => 'All entries logged via Log::Dispatch',
+        report  => qq(
+            <style type="text/css">
+              tr.even{background-color:#eee}
+            </style>
+            <div style="font-size: 80%">
+              <table>
+                <thead><tr><th>Level</th><th>Message</th></tr></thead>
+                <tbody>$history</tbody>
+              </table>
+            </div>
+            ),
+        );
+}
 
 1;
 __END__
@@ -272,6 +316,10 @@ CGI::Application::Plugin::LogDispatch - Add Log::Dispatch support to CGI::Applic
 CGI::Application::Plugin::LogDispatch adds logging support to your L<CGI::Application>
 modules by providing a L<Log::Dispatch> dispatcher object that is accessible from
 anywhere in the application.
+
+If you have L<CGI::Application::Plugin::DevPopup> installed, a "Log Entries"
+report is added to the popup window, containing all of the entries that were
+logged during the execution of the runmode.  
 
 =head1 METHODS
 
