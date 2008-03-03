@@ -1,4 +1,4 @@
-use Test::More;
+use Test::More tests => 8;
 BEGIN { use_ok('CGI::Application::Plugin::LogDispatch') };
 
 use lib './t';
@@ -13,8 +13,6 @@ if ($@) {
   plan skip_all => "Class::ISA required for Singleton support";
   exit;
 }
-
-plan tests => 7;
 
 $ENV{CGI_APP_RETURN_ONLY} = 1;
 

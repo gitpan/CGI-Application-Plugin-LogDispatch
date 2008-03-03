@@ -1,6 +1,10 @@
 Revision history for Perl extension CGI::Application::Plugin::LogDispatch.
 
-1.01
+1.02  Tue Mar  4 00:44:23 EST 2008
+
+    - Fix problem in test suite with newer versions of Test::More
+
+1.01  Tue Mar  2 00:38:22 EST 2008
 
     - fixed typo bug in log_config which should have caught
       you if you called log_config after the log object was

@@ -1,6 +1,6 @@
 ---
 name: CGI-Application-Plugin-LogDispatch
-version: 1.01
+version: 1.02
 author:
   - 'Cees Hek <ceeshek@gmail.com>'
 abstract: Plugin that adds Log::Dispatch support to CGI::Application
@@ -16,5 +16,5 @@ recommends:
 provides:
   CGI::Application::Plugin::LogDispatch:
     file: lib/CGI/Application/Plugin/LogDispatch.pm
-    version: 1.01
+    version: 1.02
 generated_by: Module::Build version 0.26

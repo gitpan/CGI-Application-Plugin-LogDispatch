@@ -10,7 +10,7 @@ use CGI::Application ();
 use File::Spec ();
 require UNIVERSAL::require;
 
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 @EXPORT = qw(
   log
